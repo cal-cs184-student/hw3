@@ -1,0 +1,364 @@
+<html>
+	<head>
+		<script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=default'></script>
+		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+		<style>
+			h1 {
+				text-align: center;
+			}
+
+			.container {
+				margin: 0 auto;
+				padding: 60px 20%;
+			}
+
+			figure {
+				text-align: center;
+			}
+
+			img {
+				display: inline-block;
+			}
+
+			body {
+				font-family: 'Inter', sans-serif;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="container">
+		<h1>CS184/284A Spring 2025 Homework 3 Write-Up</h1>
+		<div style="text-align: center;">Names: </div>
+
+		<br>
+
+		Link to webpage: <a href="https://cs184.eecs.berkeley.edu/sp25">cs184.eecs.berkeley.edu/sp25</a>
+		Link to GitHub repository: <a href="https://github.com/cal-cs184-student/sp25-hw3-jayu1">https://github.com/cal-cs184-student/sp25-hw3-jayu1</a>
+		
+		<figure>
+			<img src="images/example_image.png" alt="Cornell Boxes with Bunnies" style="width:70%"/>
+			<figcaption>You can add images with captions!</figcaption>
+		</figure>
+
+		<!--
+		We've already added one heading per part, to make your write-up as navigable when grading. Please fit your write-up within these sections!
+		-->
+
+		<h2>Overview</h2>
+		In this project we are rendering 3d objects while optmizing their rendering, adding lighting, and overall learning about algorithims used to render lighting, coloring, and 3d models.
+
+		<h2>Part 1: Ray Generation and Scene Intersection</h2>
+		Ray Generation
+		<ul>
+			<li>Convert (x,y) to 2x2 matrix</li>
+			<li>Map to camera space at z = -1</li>
+			<li>Rotate/translate to world space</li>
+			<li>Clip by [min_t, max_t]</li>
+		</ul>
+		Primitive Intersection
+		<ul>
+			<li>Use a BVH to prune</li>
+			<li>Loop through triangles and use Möller–Trumbore to find a valid intersection</li>
+			<li>Loop through sphere and solve the quadratic for r^2</li>
+			<li>Update ray.max_t and record intersection in an Intersection class if valid</li>
+		</ul>
+
+		Möller–Trumbore finds the triangle's intersection using barycentric coordinates using cross and dot products of the ray direction and triangle edges. It relys on checking if intersection point is in the triangle and ultimetely returns the parametric distance of the ray if its valid.
+
+		<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="images/CBempty.png" width="400px"/>
+				  <figcaption>Rendering of the CBempty.dae file.</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="images/CBspheres.png" width="400px"/>
+				  <figcaption>Rendering of the CBspheres_lambertian.dae file.</figcaption>
+				</td>
+				</tr>
+			</table>
+		</div>
+		
+		<h2>Part 2: Bounding Volume Hierarchy</h2>
+		
+		<p>BVH construction algorithm: 
+			<ul>
+				<li>After finding the bounding box, we check if the number of primitives is less than the max_leaf_size, and if it is we store them as leaf nodes</li>
+				<li>If the number of primitives is more than the max_leaf_size, we find the bounding box optmizing for splitting</li>
+				<li>Then we split the primitives based on the midpoint, comparing if the center is greater than or less than the mid point. Finally recursively find the left and right subtrees to create a BVH </li>
+			</ul>
+		</p>
+
+		<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="images/maxplanck_screenshot_3-18_15-42-52.png" width="400px"/>
+				  <figcaption>Rendering of the Maxplanck.dae file.</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="images/peter_screenshot_3-18_16-37-13.png" width="400px"/>
+				  <figcaption>Rendering of the peter.dae file.</figcaption>
+				</td>
+				</tr>
+			</table>
+		</div>
+
+		<p>At the beganinng of this part of the assignment, I was seeing rendering times taking up to 30 seconds. This typically isn't wildly for a loading complicated files on my laptop, however for us to be able to render things like 3D modals or other large files, this isn't optimized. When using the BVH algorithm, my loading times became almost instantious, but the proof is in the pudding:
+			<ul>
+				<li>First we need to change how this function opperates in order to test the difference between BVH and no BVH: BVHAccel::BVHAccel(const std::vector<Primitive *> &_primitives,
+					size_t max_leaf_size). By changing the max max_leaf_size, to simply be the size of the prematives, we can test this more seemlessly. </li>
+				<li>Using the cow.dae file, we are able to deduce that without BVH: 6.8851s for rendering (which takes up the most time)</li>
+				<li>When using BVH, rendering is cut down to 0.0465s.</li>
+				<li>When using a larger file like peter.dae. we get 61.6721s without BVH. With BVH, we get 0.0531s for rendering which is a mind blowing difference.</li>
+			</ul>
+			Overall, we can see there is a big difference when using BVH.
+		</p>
+
+		<h2>Part 3: Direct Illumination</h2>
+		Implementations of the direct lighting function:
+
+		<ul>
+			<li>Uniform hemisphere sampling: Sampled directions equally over the hemisphere, casted shadow rays in the sampled direction, unless blocked - in which case we accumulate light contribution</li>
+			<li>Light sampling: For each light, we sampled it's direction and casted it's shadow rays. </li>
+		</ul>
+
+		<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+
+				<tr>
+					<td style="text-align: center;">
+					  <img src="images/CBbunny_H_64_32.png" width="400px"/>
+					  <figcaption>Uniform Sampling:./pathtracer -t 8 -s 64 -l 32 -m 6 -H -f CBbunny_H_64_32.png -r 480 360 ../dae/sky/CBbunny.dae</figcaption>
+					</td>
+					<td style="text-align: center;">
+					  <img src="images/CBbunny_16_8.png" width="400px"/>
+					  <figcaption>Uniform Sampling: ./pathtracer -t 8 -s 16 -l 8 -m 6 -H -f CBbunny_16_8.png -r 480 360 ../dae/sky/CBbunny.dae</figcaption>
+					</td>
+					</tr>
+
+				<tr>
+					<td style="text-align: center;">
+						<img src="images/CBbunny_il_64_32.png" width="400px"/>
+						<figcaption>Light Sampling: ./pathtracer -t 8 -s 64 -l 32 -m 6 -f CBbunny_il_64_32.png -r 480 360 ../dae/sky/CBbunny.dae</figcaption>
+					</td>
+				</tr>
+			  <tr>
+				
+				<td style="text-align: center;">
+				  <img src="images/CBbunny_IS_1_1.png" width="400px"/>
+				  <figcaption>Light Sampling: Grainy images ./pathtracer -t 8 -s 1 -l 1 -m 1 -f CBbunny_IS_1_1.png -r 480 360 ../dae/sky/CBbunny.dae				</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="images/CBbunny_IS_1_4.png" width="400px"/>
+				  <figcaption>Light Sampling: slight improvement on image quality ./pathtracer -t 8 -s 1 -l 4 -m 1 -f CBbunny_IS_1_4.png -r 480 360 ../dae/sky/CBbunny.dae				</figcaption>
+				</td>
+				</tr>
+
+				<tr>
+					<td style="text-align: center;">
+					  <img src="images/CBbunny_IS_1_16.png" width="400px"/>
+					  <figcaption>Light Sampling: smoother ./pathtracer -t 8 -s 1 -l 16 -m 1 -f CBbunny_IS_1_16.png -r 480 360 ../dae/sky/CBbunny.dae					</figcaption>
+					</td>
+					<td style="text-align: center;">
+					  <img src="images/CBbunny_IS_1_64.png" width="400px"/>
+					  <figcaption>Light Sampling: very smooth ./pathtracer -t 8 -s 1 -l 64 -m 1 -f CBbunny_IS_1_64.png -r 480 360 ../dae/sky/CBbunny.dae
+					</figcaption>
+					</td>
+				</tr>
+			</table>
+		</div>
+
+		<p>Comparision: 
+			Generally speaking, in terms of just methodology, with Uniform sampling, we can see that there is a lot more noise in the photos. We can also see more inconsitences in terms of where the light is going rather than a more focused approach of light on the bunny. For example, with uniform sampling, the bunny's ear is a lot more bright than compared to light sampling. This is because the light sampling is basically taking the lights actual ray direction, distance, etc. into account in showing how much lighting is actually applied to the object. Overall, it can be pretty clearly seen that the light sampling leads to better lighting quality. 
+
+		</p>
+
+		
+
+		<h2>Part 4: Global Illumination</h2>
+		<p>Implementation of the indirect lighting: 
+			<ul>
+				<li>initialize local coordinates</li>
+				<li>We then use sample_f to sample an incoming direction and get the pdf</li>
+				<li>Next we flip a coin to decide whether to stop this recursive loop, returning direct lighting if we do stop it</li>
+				<li>Finally we take the direction and transform it to fit in the world. Then we create a new bounce ray with less depth and keep recruisively doing this proccess till there is no more depth</li>
+				<li>Recursive Accumulation</li>
+			</ul>
+		</p>
+
+		<p></p>
+		<img src="images/cbspheres_global.png" width="400px"/>
+		<figcaption>CBBunny Global (direct and indirect) illumination</figcaption>
+
+		<img src="images/empty_global.png" width="400px"/>
+		<figcaption>Empty Global (direct and indirect) illumination</figcaption>
+
+
+		<p>Clearly, when looking at these pictures the indirect lighting is brighter and overall looks better than direct lighting. The direct lighting has too many darkly shaded shadows that don't look natural.</p>
+		<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+					<img src="images/bunny_direct.png" width="400px"/>
+					<figcaption>direct</figcaption>
+				</td>
+				<td style="text-align: center;">
+					<img src="images/bunny_indirect.png" width="400px"/>
+					<figcaption>indirect</figcaption>
+				</td>
+				</tr>
+			</table>
+		</div>
+
+		<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="images/cbbunny_m0.png" width="400px"/>
+				  <figcaption>m = 0, isAccumBounces = false</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="images/cbbunny_m1.png" width="400px"/>
+				  <figcaption>m=1, isAccumBounces = false</figcaption>
+				</td>
+				</tr>
+				<tr>
+					<td style="text-align: center;">
+					  <img src="images/cbbunny_m2.png" width="400px"/>
+					  <figcaption>m=2, isAccumBounces = false</figcaption>
+					</td>
+					<td style="text-align: center;">
+					  <img src="images/cbbunny_m3.png" width="400px"/>
+					  <figcaption>m=3, isAccumBounces = false</figcaption>
+					</td>
+				</tr>
+				<tr>
+					<td style="text-align: center;">
+						<img src="images/cbbunny_m4.png" width="400px"/>
+						<figcaption>m=4, isAccumBounces = false</figcaption>
+					</td>
+					<td style="text-align: center;">
+						<img src="images/cbbunny_m5.png" width="400px"/>
+						<figcaption>m=5, isAccumBounces = false</figcaption>
+					</td>
+				</tr>
+				<tr>
+					<td style="text-align: center;">
+						<img src="images/cbbunny_m0_acc.png" width="400px"/>
+						<figcaption>m=0, isAccumBounces = true</figcaption>
+					</td>
+					<td style="text-align: center;">
+						<img src="images/cbbunny_m1_acc.png" width="400px"/>
+						<figcaption>m=1, isAccumBounces = true</figcaption>
+					</td>
+				</tr>
+				<tr>
+					<td style="text-align: center;">
+						<img src="images/cbbunny_m2_acc.png" width="400px"/>
+						<figcaption>m=2, isAccumBounces = true</figcaption>
+					</td>
+					<td style="text-align: center;">
+						<img src="images/cbbunny_m3_acc.png" width="400px"/>
+						<figcaption>m=3, isAccumBounces = true</figcaption>
+					</td>
+				</tr>
+				<tr>
+					<td style="text-align: center;">
+						<img src="images/cbbunny_m4_acc.png" width="400px"/>
+						<figcaption>m=4, isAccumBounces = true</figcaption>
+					</td>
+					<td style="text-align: center;">
+						<img src="images/cbbunny_m5_acc.png" width="400px"/>
+						<figcaption>m=5, isAccumBounces = true</figcaption>
+					</td>
+				</tr>
+				<tr>
+					<td style="text-align: center;">
+						<img src="images/cbbunny_rr100.png" width="400px"/>
+						<figcaption>m = 100, isAccumBounces = true</figcaption>
+					</td>
+				</tr>
+
+
+				<tr>
+					<td style="text-align: center;">
+						<p>When looking at the different sample-per-pixel rates, that as we go up in value, the edges get smoother. </p>
+						<img src="images/cbbunny_s1.png" width="400px"/>
+						<figcaption>s = 1</figcaption>
+					</td>
+					<td style="text-align: center;">
+						<img src="images/cbbunny_s2.png" width="400px"/>
+						<figcaption>s = 2</figcaption>
+					</td>
+				</tr>
+				<tr>
+					<td style="text-align: center;">
+						<img src="images/cbbunny_s4.png" width="400px"/>
+						<figcaption>s= 4</figcaption>
+					</td>
+					<td style="text-align: center;">
+						<img src="images/cbbunny_s8.png" width="400px"/>
+						<figcaption>s= 8</figcaption>
+					</td>
+				</tr>
+				<tr>
+					<td style="text-align: center;">
+						<img src="images/cbbunny_s16.png" width="400px"/>
+						<figcaption>s= 16</figcaption>
+					</td>
+					<td style="text-align: center;">
+						<img src="images/cbbunny_s64.png" width="400px"/>
+						<figcaption>s= 64</figcaption>
+					</td>
+				</tr>
+				<tr>
+					<td style="text-align: center;">
+						<img src="images/cbbunny_s1024.png" width="400px"/>
+						<figcaption>s= 1024</figcaption>
+					</td>
+				</tr>
+			</table>
+		</div>
+
+		<h2>Part 5: Adaptive Sampling</h2>
+		
+		Explain adaptive sampling. Walk through your implementation of the adaptive sampling.
+		<p>Adaptive Sampling: This is an algorithm that basically adjusts how many samples we are using for every pixel we render vs using a fixed number in the Monte Carlo Path tracing function.</p>
+		<p>Implementation: 
+			<ul>
+				<li>Initialize accumulators to track sum and sum squared of s1 and s2 respectively. </li>
+				<li>Then For each pixel gen a camera ray with a rand. offset, and trace through scene to update s1 and s2</li>
+				<li>Next use batches of samples & their illuminaces to calculate confidence intervals</li>
+				<li>If the confidence intervals is less than the max tollarance, we stop converging and calcuate the color of pixel.</li>
+			</ul>
+		</p>
+		<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+					<img src="images/CBEmpty_2048_rate.png" width="400px"/>
+					<figcaption>CBEmpty rate</figcaption>
+				</td>
+				<td style="text-align: center;">
+					<img src="images/CBEmpty_2048.png" width="400px"/>
+					<figcaption>CBEmpty - ./pathtracer -t 8 -s 2048 -l 1 -m 5 -a 64 0.05 -r 480 360 -f CBEmpty_2048.png ../dae/sky/CBempty.dae</figcaption>
+				</td>
+				</tr>
+				<tr>
+				<td style="text-align: center;">
+					<img src="images/CBbunny_2048_rate.png" width="400px"/>
+					<figcaption>CBbunny rate</figcaption>
+				</td>
+				<td style="text-align: center;">
+					<img src="images/CBbunny_2048.png" width="400px"/>
+					<figcaption>CBBunny - ./pathtracer -t 8 -s 2048 -l 1 -m 5 -a 64 0.05 -r 480 360 -f CBbunny_2048.png ../dae/sky/CBbunny.dae</figcaption>
+				</td>
+				</tr>
+			</table>
+		</div>
+
+		</div>
+	</body>
+</html>
